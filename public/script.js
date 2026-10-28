@@ -175,15 +175,26 @@ document.querySelectorAll(".profile-menu-item[href]").forEach((link) => {
   link.addEventListener("click", closeProfileMenu);
 });
 
-document.getElementById("logoutBtn").addEventListener("click", async () => {
+document.getElementById("logoutBtn").addEventListener("click", async (event) => {
+  const logoutButton = event.currentTarget;
+  logoutButton.disabled = true;
+  let logoutMessage = "You have logged out.";
+
   try {
     await apiRequest("/auth/logout", { method: "POST" });
+  } catch (error) {
+    logoutMessage = `Logged out on this device. The server could not be notified: ${error.message}`;
+  } finally {
     currentUser = null;
     sessionToken = "";
     localStorage.removeItem("skillswap_token");
-    window.location.href = "/";
-  } catch (error) {
-    showToast(error.message);
+    setAuthView();
+    await loadSkills();
+    await loadMySessions();
+    window.location.hash = "#home";
+    showPageFromLocation();
+    logoutButton.disabled = false;
+    showToast(logoutMessage);
   }
 });
 
