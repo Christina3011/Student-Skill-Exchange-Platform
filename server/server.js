@@ -216,18 +216,29 @@ app.get("/api/stats", async (req, res) => {
   }
 });
 
-// Helpful starter skills are added only when the skills collection is empty.
+// Add starter skills that are not already in the collection.
 async function addSampleSkills() {
-  const count = await Skill.countDocuments();
-  if (count > 0) return;
-
   const samples = [
     { title: "Python Basics", category: "Programming", description: "Learn variables, loops, functions and simple Python programs.", level: "Beginner" },
     { title: "HTML and CSS", category: "Programming", description: "Build a basic webpage and style it with CSS.", level: "Beginner" },
     { title: "Poster Designing", category: "Design", description: "Learn the basics of making clear and creative posters.", level: "Beginner" },
     { title: "Spoken English", category: "Languages", description: "Practise everyday English conversations in a friendly way.", level: "Intermediate" },
     { title: "Basic Guitar", category: "Music", description: "Learn a few chords and practise simple songs.", level: "Beginner" },
-    { title: "Maths Help", category: "Academics", description: "Study algebra and practise solving basic maths questions.", level: "Intermediate" }
+    { title: "Maths Help", category: "Academics", description: "Study algebra and practise solving basic maths questions.", level: "Intermediate" },
+    { title: "JavaScript Fundamentals", category: "Programming", description: "Understand variables, functions, arrays and interactive webpages.", level: "Beginner" },
+    { title: "Git and GitHub", category: "Programming", description: "Practise version control, commits and sharing projects on GitHub.", level: "Beginner" },
+    { title: "Introduction to Java", category: "Programming", description: "Learn Java syntax, classes and object-oriented programming basics.", level: "Beginner" },
+    { title: "Canva Design", category: "Design", description: "Create polished social posts, presentations and simple graphics.", level: "Beginner" },
+    { title: "Figma UI Design", category: "Design", description: "Explore layouts, components and clickable app prototypes in Figma.", level: "Intermediate" },
+    { title: "Photography Basics", category: "Design", description: "Practise composition, lighting and taking better photos with a phone.", level: "Beginner" },
+    { title: "Spanish Conversation", category: "Languages", description: "Build confidence with useful Spanish phrases and everyday conversation.", level: "Beginner" },
+    { title: "French for Beginners", category: "Languages", description: "Learn French greetings, pronunciation and common expressions.", level: "Beginner" },
+    { title: "Study Skills and Note-taking", category: "Academics", description: "Try practical note-taking, revision and study-planning techniques.", level: "Beginner" },
+    { title: "Physics Problem Solving", category: "Academics", description: "Work through foundational mechanics problems step by step.", level: "Intermediate" },
+    { title: "Piano Basics", category: "Music", description: "Learn keyboard notes, simple scales and beginner-friendly melodies.", level: "Beginner" },
+    { title: "Ukulele for Beginners", category: "Music", description: "Practise basic chords and strumming patterns on the ukulele.", level: "Beginner" },
+    { title: "Public Speaking", category: "Other", description: "Build confidence with clear speaking, presentation and practice tips.", level: "Beginner" },
+    { title: "Resume and Interview Practice", category: "Other", description: "Get peer support preparing a student resume and practising interviews.", level: "Intermediate" }
   ];
 
   let sampleOwner = await User.findOne({ email: "sample@skillswap.local" });
@@ -239,8 +250,16 @@ async function addSampleSkills() {
     });
   }
 
-  await Skill.insertMany(samples.map((sample) => ({ ...sample, owner: sampleOwner._id })));
-  console.log("Sample skills added.");
+  const existingSkills = await Skill.find({ title: { $in: samples.map((sample) => sample.title) } })
+    .select("title")
+    .lean();
+  const existingTitles = new Set(existingSkills.map((skill) => skill.title));
+  const missingSamples = samples.filter((sample) => !existingTitles.has(sample.title));
+
+  if (missingSamples.length) {
+    await Skill.insertMany(missingSamples.map((sample) => ({ ...sample, owner: sampleOwner._id })));
+    console.log(`Added ${missingSamples.length} sample skills.`);
+  }
 }
 
 app.get("*", (req, res) => {
