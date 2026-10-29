@@ -4,6 +4,7 @@ let currentUser = null;
 let allSkills = [];
 let authMode = "register";
 let sessionToken = localStorage.getItem("skillswap_token") || "";
+let knownIncomingRequestIds = null;
 
 const authModal = new bootstrap.Modal(document.getElementById("authModal"));
 const skillModal = new bootstrap.Modal(document.getElementById("skillModal"));
@@ -73,6 +74,8 @@ function setAuthView() {
   document.getElementById("loginNav").hidden = Boolean(currentUser);
   document.getElementById("registerNav").hidden = Boolean(currentUser);
   userProfilePanel.hidden = !currentUser;
+  document.getElementById("incomingRequestCount").hidden = true;
+  document.getElementById("incomingRequestCount").textContent = "";
   profileCard.hidden = true;
   document.getElementById("profileTrigger").setAttribute("aria-expanded", "false");
 
@@ -185,6 +188,7 @@ document.getElementById("logoutBtn").addEventListener("click", async (event) => 
   } finally {
     currentUser = null;
     sessionToken = "";
+    knownIncomingRequestIds = null;
     localStorage.removeItem("skillswap_token");
     setAuthView();
     await loadSkills();
@@ -336,7 +340,7 @@ function renderSkillCard(skill) {
         </div>
         ${currentUser && isCurrentUsersSkill(skill)
           ? '<button class="btn btn-outline-secondary w-100" disabled>Your skill</button>'
-          : `<button class="btn btn-primary w-100 request-session" data-id="${escapeHtml(skill._id)}">Request a session</button>`}
+          : `<button class="btn btn-primary w-100 request-session" data-id="${escapeHtml(skill._id)}">Request to Learn</button>`}
       </div>
     </div>`;
 }
@@ -405,20 +409,31 @@ document.getElementById("sessionForm").addEventListener("submit", async (event) 
 });
 
 async function loadMySessions() {
-  const container = document.getElementById("mySessions");
+  const sentContainer = document.getElementById("mySessions");
+  const incomingContainer = document.getElementById("incomingRequests");
+  const requestCount = document.getElementById("incomingRequestCount");
   if (!currentUser) {
-    container.innerHTML = "";
+    sentContainer.innerHTML = "";
+    incomingContainer.innerHTML = "";
+    requestCount.textContent = "";
+    requestCount.hidden = true;
+    knownIncomingRequestIds = null;
     return;
   }
 
   try {
-    const data = await apiRequest("/sessions/mine");
-    if (!data.sessions.length) {
-      container.innerHTML = '<div class="col-12 text-muted">You have not requested any sessions yet.</div>';
-      return;
-    }
+    const [sentData, incomingData] = await Promise.all([
+      apiRequest("/sessions/mine"),
+      apiRequest("/sessions/incoming")
+    ]);
+    const sentSessions = sentData.sessions || [];
+    const incomingSessions = incomingData.sessions || [];
+    updateIncomingRequestNotifications(incomingSessions);
 
-    container.innerHTML = data.sessions.map((session) => `
+    incomingContainer.innerHTML = incomingSessions.length
+      ? incomingSessions.map(renderIncomingRequest).join("")
+      : '<div class="col-12 text-muted">You have no incoming requests yet.</div>';
+    sentContainer.innerHTML = sentSessions.length ? sentSessions.map((session) => `
       <div class="col-md-6">
         <div class="session-card">
           <h4 class="h6">${escapeHtml(session.skill?.title || "Skill session")}</h4>
@@ -427,10 +442,84 @@ async function loadMySessions() {
           <p class="mb-1"><strong>Status:</strong> <span class="badge text-bg-${session.status === "Accepted" ? "success" : "secondary"}">${escapeHtml(session.status)}</span></p>
           <p class="text-muted mb-0">${escapeHtml(session.note || "No message added.")}</p>
         </div>
-      </div>`).join("");
+      </div>`).join("") : '<div class="col-12 text-muted">You have not requested any sessions yet.</div>';
+    attachRequestStatusHandlers(incomingContainer);
   } catch (error) {
-    container.innerHTML = `<div class="col-12 text-muted">${escapeHtml(error.message)}</div>`;
+    const message = escapeHtml(error.message);
+    incomingContainer.innerHTML = `<div class="col-12"><div class="alert alert-warning">${message}</div></div>`;
+    sentContainer.innerHTML = `<div class="col-12"><div class="alert alert-warning">${message}</div></div>`;
   }
+}
+
+function updateIncomingRequestNotifications(sessions) {
+  const pendingIncoming = sessions.filter((session) => session.status === "Pending");
+  const requestCount = document.getElementById("incomingRequestCount");
+  requestCount.textContent = pendingIncoming.length;
+  requestCount.hidden = pendingIncoming.length === 0;
+
+  if (knownIncomingRequestIds) {
+    const newRequests = pendingIncoming.filter((session) => !knownIncomingRequestIds.has(session._id));
+    if (newRequests.length) {
+      showToast(newRequests.length === 1
+        ? `New request to learn ${newRequests[0].skill?.title ? `“${newRequests[0].skill.title}”` : "one of your skills"}.`
+        : `${newRequests.length} new learning requests received.`);
+    }
+  }
+  knownIncomingRequestIds = new Set(sessions.map((session) => session._id));
+}
+
+async function checkIncomingRequests() {
+  if (!currentUser) return;
+  try {
+    const data = await apiRequest("/sessions/incoming");
+    updateIncomingRequestNotifications(data.sessions || []);
+  } catch (error) {
+    console.error("Could not check incoming learning requests:", error);
+  }
+}
+
+function renderIncomingRequest(session) {
+  const learner = session.learner || {};
+  const skill = session.skill || {};
+  const statusClass = session.status === "Accepted" ? "success" : "secondary";
+  return `
+    <div class="col-md-6">
+      <div class="session-card">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <h4 class="h6">${escapeHtml(skill.title || "Skill request")}</h4>
+          <span class="badge text-bg-${statusClass}">${escapeHtml(session.status)}</span>
+        </div>
+        <p class="mb-1"><strong>Learner:</strong> ${escapeHtml(learner.name || "Student")}</p>
+        <p class="mb-1"><strong>Email:</strong> ${escapeHtml(learner.email || "Not available")}</p>
+        <p class="mb-1"><strong>Preferred date:</strong> ${escapeHtml(session.preferredDate)}</p>
+        <p class="request-message mb-3">${escapeHtml(session.note || "No message added.")}</p>
+        ${session.status === "Pending" ? `
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm request-status-action" data-id="${escapeHtml(session._id)}" data-status="Accepted">Accept</button>
+            <button type="button" class="btn btn-outline-primary btn-sm request-status-action" data-id="${escapeHtml(session._id)}" data-status="Declined">Reject</button>
+          </div>` : ""}
+      </div>
+    </div>`;
+}
+
+function attachRequestStatusHandlers(container) {
+  container.querySelectorAll(".request-status-action").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const status = button.dataset.status;
+        await apiRequest(`/sessions/${encodeURIComponent(button.dataset.id)}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status })
+        });
+        await loadMySessions();
+        showToast(status === "Accepted" ? "Learning request accepted." : "Learning request rejected.");
+      } catch (error) {
+        button.disabled = false;
+        showToast(error.message);
+      }
+    });
+  });
 }
 
 async function checkLogin() {
@@ -439,6 +528,7 @@ async function checkLogin() {
     currentUser = data.user || null;
     if (!currentUser) {
       sessionToken = "";
+      knownIncomingRequestIds = null;
       localStorage.removeItem("skillswap_token");
     }
   } catch (error) {
@@ -451,3 +541,6 @@ async function checkLogin() {
 }
 
 checkLogin();
+window.setInterval(() => {
+  checkIncomingRequests();
+}, 30000);

@@ -43,7 +43,8 @@ const User = mongoose.model("User", userSchema);
 const Skill = mongoose.model("Skill", skillSchema);
 const LearningSession = mongoose.model("LearningSession", sessionSchema);
 
-// Simple in-memory sessions for this student project.
+// in memory 
+
 const loginSessions = new Map();
 
 function makeToken() {
@@ -74,8 +75,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Add the login token to same-origin requests using a simple localStorage helper endpoint pattern.
-// The frontend keeps the token and sends it in this header.
+//login or reg
+
 app.post("/api/auth/register", async (req, res) => {
   try {
     const name = String(req.body.name || "").trim();
@@ -167,16 +168,27 @@ app.post("/api/skills", authRequired, async (req, res) => {
 
 app.post("/api/sessions", authRequired, async (req, res) => {
   try {
-    const skill = await Skill.findById(req.body.skillId);
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const skillId = String(body.skillId || "");
+    if (!mongoose.Types.ObjectId.isValid(skillId)) {
+      return res.status(400).json({ message: "Choose a valid skill." });
+    }
+
+    const skill = await Skill.findById(skillId);
     if (!skill) return res.status(404).json({ message: "This skill could not be found." });
     if (skill.owner.toString() === req.userId) return res.status(400).json({ message: "You cannot request a session for your own skill." });
 
-    const preferredDate = String(req.body.preferredDate || "");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(preferredDate) || preferredDate < new Date().toISOString().slice(0, 10)) {
+    const preferredDate = String(body.preferredDate || "");
+    const parsedDate = new Date(`${preferredDate}T00:00:00.000Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(preferredDate)
+      || Number.isNaN(parsedDate.getTime())
+      || parsedDate.toISOString().slice(0, 10) !== preferredDate
+      || preferredDate < new Date().toISOString().slice(0, 10)) {
       return res.status(400).json({ message: "Please choose today or a future date." });
     }
 
-    const note = String(req.body.note || "").trim();
+    const note = String(body.note || "").trim();
+    if (note.length > 300) return res.status(400).json({ message: "Please keep your message under 300 characters." });
     const session = await LearningSession.create({
       skill: skill._id,
       learner: req.userId,
@@ -200,6 +212,45 @@ app.get("/api/sessions/mine", authRequired, async (req, res) => {
     res.json({ sessions });
   } catch (error) {
     res.status(500).json({ message: "Could not load your session requests." });
+  }
+});
+
+app.get("/api/sessions/incoming", authRequired, async (req, res) => {
+  try {
+    const sessions = await LearningSession.find({ teacher: req.userId })
+      .populate("skill", "title category")
+      .populate("learner", "name email")
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ sessions });
+  } catch (error) {
+    res.status(500).json({ message: "Could not load incoming requests." });
+  }
+});
+
+app.patch("/api/sessions/:sessionId/status", authRequired, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { status } = req.body || {};
+    if (!mongoose.Types.ObjectId.isValid(sessionId)) {
+      return res.status(400).json({ message: "Choose a valid learning request." });
+    }
+    if (!["Accepted", "Declined"].includes(status)) {
+      return res.status(400).json({ message: "Choose Accept or Reject for this request." });
+    }
+
+    const session = await LearningSession.findOneAndUpdate(
+      { _id: sessionId, teacher: req.userId, status: "Pending" },
+      { $set: { status } },
+      { new: true, runValidators: true }
+    );
+    if (!session) {
+      return res.status(404).json({ message: "This request was not found or is no longer pending." });
+    }
+
+    res.json({ session });
+  } catch (error) {
+    res.status(500).json({ message: "Could not update this request." });
   }
 });
 

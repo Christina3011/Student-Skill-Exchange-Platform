@@ -39,7 +39,9 @@
           <div class="profile-menu-items">
             <a class="profile-menu-item" href="/#profile">My Profile</a>
             <a class="profile-menu-item" href="/#my-skills">My Skills</a>
-            <a class="profile-menu-item" href="/#my-learning-sessions">My Learning Sessions</a>
+            <a class="profile-menu-item" href="/#my-learning-sessions">
+              My Learning Sessions <span class="request-count" id="incomingRequestCount" hidden></span>
+            </a>
             <a class="profile-menu-item" href="/#settings">Settings</a>
             <button type="button" class="profile-menu-item logout-item" id="logoutBtn">Logout</button>
           </div>
@@ -129,6 +131,11 @@
           </div>
           <a class="btn btn-outline-primary" href="/#skills">Explore skills</a>
         </div>
+        <div class="mb-5">
+          <h3 class="h5 mb-3">Incoming Requests</h3>
+          <div class="row g-3" id="incomingRequests"></div>
+        </div>
+        <h3 class="h5 mb-3">My Sent Requests</h3>
         <div class="row g-3" id="mySessions"></div>
       </div>
     </section>

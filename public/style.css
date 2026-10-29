@@ -151,6 +151,26 @@ body {
   color: #a33131;
 }
 
+.request-count {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  margin-left: 5px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--primary-dark);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.request-count[hidden] {
+  display: none;
+}
+
 .nav-link {
   color: #596579;
 }
@@ -474,6 +494,11 @@ body {
   border-radius: 12px;
   padding: 18px;
   background: #fff;
+}
+
+.request-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 footer {

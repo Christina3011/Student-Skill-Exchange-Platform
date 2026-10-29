@@ -33,4 +33,5 @@ PORT=3000
 ## Notes
 - Create an account from Register before using the dashboard.
 - Passwords are hashed before being stored.
+- Learning requests are saved with a pending status. Skill owners can review and accept or reject requests from My Learning Sessions.
 - This is a simple student project. For real-world use, add stronger validation, email verification, and production security settings.
