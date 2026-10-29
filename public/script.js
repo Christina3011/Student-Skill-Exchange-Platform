@@ -9,8 +9,6 @@ const authModal = new bootstrap.Modal(document.getElementById("authModal"));
 const skillModal = new bootstrap.Modal(document.getElementById("skillModal"));
 const sessionModal = new bootstrap.Modal(document.getElementById("sessionModal"));
 
-document.getElementById("year").textContent = new Date().getFullYear();
-
 function loadDisplaySettings() {
   const settings = [
     { id: "compactCardsSetting", key: "skillswap_compact_cards", className: "compact-cards" },
@@ -108,14 +106,14 @@ function escapeHtml(value) {
 
 function iconForCategory(category) {
   const icons = {
-    Programming: "💻",
-    Design: "🎨",
-    Languages: "🌐",
-    Academics: "📚",
-    Music: "🎵",
-    Other: "✨"
+    Programming: "bi-code-slash",
+    Design: "bi-palette",
+    Languages: "bi-translate",
+    Academics: "bi-book",
+    Music: "bi-music-note-beamed",
+    Other: "bi-stars"
   };
-  return icons[category] || "💡";
+  return `<i class="bi ${icons[category] || "bi-lightbulb"}" aria-hidden="true"></i>`;
 }
 
 function isCurrentUsersSkill(skill) {

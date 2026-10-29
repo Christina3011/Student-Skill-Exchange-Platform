@@ -223,13 +223,14 @@ body {
   box-shadow: 0 12px 35px rgba(49, 83, 145, 0.08);
 }
 
-.hero-emoji {
+.hero-icon {
   width: 65px;
   height: 65px;
   display: grid;
   place-items: center;
   border-radius: 16px;
   background: #fff4d8;
+  color: var(--primary-dark);
   font-size: 2rem;
   margin-bottom: 20px;
 }
@@ -319,6 +320,7 @@ body {
   height: 48px;
   border-radius: 12px;
   background: var(--secondary);
+  color: var(--primary-dark);
   font-size: 1.5rem;
   margin-bottom: 15px;
 }
@@ -372,6 +374,7 @@ body {
   width: 54px;
   height: 54px;
   background: var(--secondary);
+  color: var(--primary-dark);
   border-radius: 14px;
   font-size: 1.6rem;
   margin-bottom: 18px;
